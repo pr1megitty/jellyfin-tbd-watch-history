@@ -6,7 +6,7 @@
 
     var PAGE_SIZE = 40;
     var overlay = null;
-    var state = { filter: 'All', start: 0, total: 0, loading: false, lastDay: null, grid: null };
+    var state = { filter: 'All', start: 0, count: 0, done: false, loading: false, lastDay: null, grid: null };
 
     function client() { return window.ApiClient; }
     function userId() {
@@ -57,7 +57,6 @@
         var url = c.getUrl('Items', {
             userId: userId(),
             Recursive: true,
-            Filters: 'IsPlayed',
             SortBy: 'DatePlayed',
             SortOrder: 'Descending',
             IncludeItemTypes: types,
@@ -123,7 +122,14 @@
         card.title = title + (sub ? ' - ' + sub : '') + (time ? ' (' + time + ')' : '');
         card.appendChild(el('div', 'tbdwh-t', title));
         card.appendChild(el('div', 'tbdwh-s', sub));
-        card.appendChild(el('div', 'tbdwh-s', time ? 'Watched ' + time : ''));
+        var ud = item.UserData || {};
+        var inProgress = !ud.Played && ud.PlaybackPositionTicks > 0;
+        var label = 'Watched';
+        if (inProgress) {
+            label = 'In progress';
+            if (item.RunTimeTicks) { label += ' \u00b7 ' + Math.round(ud.PlaybackPositionTicks / item.RunTimeTicks * 100) + '%'; }
+        }
+        card.appendChild(el('div', 'tbdwh-s', time ? label + ' \u00b7 ' + time : label));
 
         card.addEventListener('click', function () { openItem(item); });
         card._tbdItem = item;
@@ -153,7 +159,7 @@
     function load(reset) {
         if (!overlay || state.loading) { return; }
         if (reset) {
-            state.start = 0; state.total = 0; state.lastDay = null; state.grid = null;
+            state.start = 0; state.count = 0; state.done = false; state.lastDay = null; state.grid = null;
             overlay.querySelector('#tbdwh-list').innerHTML = '';
         }
         state.loading = true;
@@ -168,15 +174,20 @@
             state.loading = false;
             if (!overlay) { return; }
             var items = (res && res.Items) || [];
-            state.total = (res && res.TotalRecordCount) || 0;
+            var kept = items.filter(function (i) {
+                var u = i.UserData;
+                return u && (u.LastPlayedDate || u.Played);
+            });
             state.start += items.length;
-            render(items);
-            if (state.start === 0) {
+            state.count += kept.length;
+            state.done = kept.length < items.length || items.length < PAGE_SIZE;
+            render(kept);
+            if (state.count === 0) {
                 updateStatus('Nothing watched yet.');
             } else {
-                updateStatus(state.start + ' of ' + state.total + ' watched');
+                updateStatus(state.count + ' watched' + (state.done ? '' : ' so far'));
             }
-            if (more) { more.style.display = state.start < state.total ? '' : 'none'; }
+            if (more) { more.style.display = state.done ? 'none' : ''; }
             if (reset) {
                 var first = overlay.querySelector('.tbdwh-card');
                 if (first) { first.focus(); }
@@ -235,7 +246,7 @@
         overlay.appendChild(body);
 
         overlay.addEventListener('scroll', function () {
-            if (overlay.scrollTop + overlay.clientHeight > overlay.scrollHeight - 400 && state.start < state.total) { load(false); }
+            if (overlay.scrollTop + overlay.clientHeight > overlay.scrollHeight - 400 && !state.done) { load(false); }
         });
 
         document.body.appendChild(overlay);
@@ -293,95 +304,42 @@
         }
     }, true);
 
-    /* ---------- entry points (drawer, header, fallback button) ---------- */
+    /* ---------- entry point ----------
+       One floating button appended straight to <body>, OUTSIDE jellyfin-web's React root.
+       Never insert nodes into the header/drawer: React re-renders those and crashes the page
+       ("blank" pages, missing player UI) when it finds nodes it did not create. */
 
-    function makeDrawerLink() {
-        var a = el('a', 'navMenuOption lnkMediaFolder');
-        a.id = 'tbdwh-nav';
-        a.href = '#';
-        a.setAttribute('data-itemid', 'tbdwh');
-        var icon = el('span', 'material-icons navMenuOptionIcon', 'history');
-        icon.setAttribute('aria-hidden', 'true');
-        a.appendChild(icon);
-        a.appendChild(el('span', 'navMenuOptionText', 'Watch History'));
-        a.addEventListener('click', function (e) {
-            e.preventDefault();
-            open();
-        });
-        return a;
+    function onVideoRoute() {
+        return window.location.hash.indexOf('#/video') === 0 || !!document.querySelector('video');
     }
 
-    function makeHeaderButton() {
-        var b = el('button', 'headerButton headerButton-right paper-icon-button-light');
-        b.id = 'tbdwh-head-btn';
+    function makeFab() {
+        var b = el('button');
+        b.id = 'tbdwh-fab';
         b.type = 'button';
         b.title = 'Watch History';
+        b.setAttribute('aria-label', 'Watch History');
         var icon = el('span', 'material-icons', 'history');
         icon.setAttribute('aria-hidden', 'true');
         b.appendChild(icon);
+        b.style.cssText = 'position:fixed;right:1em;bottom:1em;z-index:9000;width:3em;height:3em;border-radius:50%;border:0;background:rgba(40,40,40,.85);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.5)';
         b.addEventListener('click', open);
         return b;
     }
 
-    function ensureEntryPoints() {
-        var existing = document.getElementById('tbdwh-nav');
-        var existingHead = document.getElementById('tbdwh-head-btn');
+    function ensureButton() {
         var fab = document.getElementById('tbdwh-fab');
-
-        if (!userId()) {
-            [existing, existingHead, fab].forEach(function (n) { if (n && n.parentNode) { n.parentNode.removeChild(n); } });
-            return;
+        var show = !!userId() && !overlay && !onVideoRoute();
+        if (show && !fab) {
+            document.body.appendChild(makeFab());
+        } else if (!show && fab && fab.parentNode) {
+            fab.parentNode.removeChild(fab);
         }
-
-        var placed = !!(existing && document.body.contains(existing)) || !!(existingHead && document.body.contains(existingHead));
-
-        if (!existing || !document.body.contains(existing)) {
-            var container = document.querySelector('.mainDrawer-scrollContainer .scrollContainer') || document.querySelector('.mainDrawer-scrollContainer');
-            if (container) {
-                var link = makeDrawerLink();
-                var firstOption = container.querySelector('a.navMenuOption');
-                if (firstOption && firstOption.nextSibling) { container.insertBefore(link, firstOption.nextSibling); }
-                else { container.appendChild(link); }
-                placed = true;
-            }
-        }
-
-        if (!existingHead || !document.body.contains(existingHead)) {
-            var right = document.querySelector('.headerRight');
-            if (right) {
-                var btn = makeHeaderButton();
-                right.insertBefore(btn, right.firstChild);
-                placed = true;
-            }
-        }
-
-        if (placed && fab && fab.parentNode) { fab.parentNode.removeChild(fab); }
-    }
-
-    var scheduled = false;
-    function schedule() {
-        if (scheduled) { return; }
-        scheduled = true;
-        window.requestAnimationFrame(function () { scheduled = false; try { ensureEntryPoints(); } catch (e) { /* ignore */ } });
     }
 
     function start() {
-        new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
-        schedule();
-
-        // Fallback floating button if the web client layout has no drawer/header we recognise.
-        setTimeout(function () {
-            if (!userId() || document.getElementById('tbdwh-nav') || document.getElementById('tbdwh-head-btn') || document.getElementById('tbdwh-fab')) { return; }
-            addStyles();
-            var f = el('button', 'tbdwh-btn', 'History');
-            f.id = 'tbdwh-fab';
-            f.title = 'Watch History';
-            f.style.width = 'auto';
-            f.style.borderRadius = '2em';
-            f.style.padding = '.6em 1em';
-            f.addEventListener('click', open);
-            document.body.appendChild(f);
-        }, 10000);
+        setInterval(function () { try { ensureButton(); } catch (e) { /* ignore */ } }, 1500);
+        ensureButton();
     }
 
     window.TBDWatchHistory = { open: open, close: close };
