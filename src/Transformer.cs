@@ -28,7 +28,13 @@ public static class Transformer
         string block = "<script " + Marker + ">" + Script.Value + "</script>";
         int index = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
 
-        return index >= 0 ? html.Insert(index, block) : html + block;
+        if (index < 0)
+        {
+            // Not the real index.html (File Transformation can match other files too). Leave it untouched.
+            return html;
+        }
+
+        return html.Insert(index, block);
     }
 
     private static string LoadScript()

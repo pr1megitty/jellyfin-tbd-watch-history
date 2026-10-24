@@ -75,7 +75,7 @@ public class Plugin : BasePlugin<BasePluginConfiguration>
         string json = JsonSerializer.Serialize(new
         {
             id = TransformGuid,
-            fileNamePattern = "index.html",
+            fileNamePattern = @"index\.html",
             callbackAssembly = typeof(Plugin).Assembly.FullName,
             callbackClass = typeof(Transformer).FullName,
             callbackMethod = nameof(Transformer.Inject)
