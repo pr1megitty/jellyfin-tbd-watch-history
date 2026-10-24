@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Work out version from tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          dotnet publish src/Jellyfin.Plugin.TbdWatchHistory.csproj -c Release -o out \
+            -p:AssemblyVersion=${VERSION} -p:FileVersion=${VERSION}
+
+      - name: Package and write manifest
+        run: |
+          mkdir -p dist
+          ZIP="tbd-watch-history_${VERSION}.zip"
+          (cd out && zip -j ../dist/$ZIP Jellyfin.Plugin.TbdWatchHistory.dll)
+          MD5=$(md5sum dist/$ZIP | cut -d' ' -f1)
+          python3 - <<PY
+          import json, datetime
+          manifest = [{
+            "guid": "7a0b5df1-bb7b-4a0b-add5-8afe03e880f0",
+            "name": "TBD Watch History",
+            "description": "Adds a per-user Watch History page to the Jellyfin web client.",
+            "overview": "Shows every movie and episode a user has watched, newest first.",
+            "owner": "pr1megitty",
+            "category": "General",
+            "imageUrl": "",
+            "versions": [{
+              "version": "${VERSION}",
+              "changelog": "Release ${TAG}",
+              "targetAbi": "12.0.0.0",
+              "sourceUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ZIP}",
+              "checksum": "${MD5}",
+              "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            }]
+          }]
+          json.dump(manifest, open("dist/manifest.json", "w"), indent=2)
+          PY
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dist/* --title "$TAG" --notes "TBD Watch History $TAG"
