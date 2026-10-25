@@ -25,7 +25,8 @@ public static class Transformer
             return html;
         }
 
-        string block = "<script " + Marker + ">" + Script.Value + "</script>";
+        string flag = "<script>window.__tbdwhPage=" + (Plugin.PageRegistered ? "true" : "false") + ";</script>";
+        string block = flag + "<script " + Marker + ">" + Script.Value + "</script>";
         int index = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
 
         if (index < 0)

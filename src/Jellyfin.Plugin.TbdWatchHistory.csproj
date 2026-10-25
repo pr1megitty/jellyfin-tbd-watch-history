@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="web\watchhistory.js" />
+    <EmbeddedResource Include="web\watchhistory.html" />
   </ItemGroup>
 
 </Project>

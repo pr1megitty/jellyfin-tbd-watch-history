@@ -211,7 +211,7 @@
         var head = el('div');
         head.id = 'tbdwh-head';
         var back = el('button', 'tbdwh-btn', '\u2190 Back');
-        back.addEventListener('click', close);
+        back.addEventListener('click', closeAndReturn);
         head.appendChild(back);
         head.appendChild(el('h1', null, 'Watch History'));
         ['All', 'Movies', 'Episodes'].forEach(function (name) {
@@ -267,7 +267,7 @@
         if (!overlay) { return; }
         var k = e.keyCode;
         var back = k === 27 || k === 461 || k === 10009 || k === 8;
-        if (back) { e.preventDefault(); e.stopPropagation(); close(); return; }
+        if (back) { e.preventDefault(); e.stopPropagation(); closeAndReturn(); return; }
 
         if (k === 13 && document.activeElement && document.activeElement._tbdItem) {
             e.preventDefault(); e.stopPropagation();
@@ -304,10 +304,18 @@
         }
     }, true);
 
-    /* ---------- entry point ----------
-       One floating button appended straight to <body>, OUTSIDE jellyfin-web's React root.
-       Never insert nodes into the header/drawer: React re-renders those and crashes the page
-       ("blank" pages, missing player UI) when it finds nodes it did not create. */
+    /* ---------- entry points ----------
+       Main entry: the "Watch History" item in the user menu, added by the Plugin Pages plugin.
+       Opening that page runs this overlay. A small floating button is shown ONLY when the
+       server could not register that menu entry. Nothing is added to Jellyfin's own DOM. */
+
+    var openedFromPage = false;
+
+    function closeAndReturn() {
+        var fromPage = openedFromPage;
+        close();
+        if (fromPage) { window.history.back(); }
+    }
 
     function onVideoRoute() {
         return window.location.hash.indexOf('#/video') === 0 || !!document.querySelector('video');
@@ -329,7 +337,7 @@
 
     function ensureButton() {
         var fab = document.getElementById('tbdwh-fab');
-        var show = !!userId() && !overlay && !onVideoRoute();
+        var show = !window.__tbdwhPage && !!userId() && !overlay && !onVideoRoute();
         if (show && !fab) {
             document.body.appendChild(makeFab());
         } else if (!show && fab && fab.parentNode) {
@@ -337,9 +345,19 @@
         }
     }
 
+    function autoOpenFromPage() {
+        var p = document.getElementById('tbdwh-plugin-page');
+        if (p && !p.getAttribute('data-opened') && !overlay && userId()) {
+            p.setAttribute('data-opened', '1');
+            open();
+            openedFromPage = true;
+        }
+    }
+
     function start() {
-        setInterval(function () { try { ensureButton(); } catch (e) { /* ignore */ } }, 1500);
-        ensureButton();
+        setInterval(function () {
+            try { autoOpenFromPage(); ensureButton(); } catch (e) { /* ignore */ }
+        }, 500);
     }
 
     window.TBDWatchHistory = { open: open, close: close };
