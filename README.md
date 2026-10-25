@@ -1,22 +1,36 @@
-# Watch History
+# TBD Watch History
 
-A Jellyfin plugin that gives every user a **Watch History** page (movies and TV episodes they have
-watched, newest first, grouped by day, with All / Movies / TV Episodes filters).
+A Jellyfin plugin that gives every user a **Watch History** page: the movies and TV episodes they have
+watched or started, newest first, grouped by day, with All / Movies / TV Episodes filters. Each user only
+ever sees their own history.
 
-It needs the **File Transformation** plugin. It uses only the normal Jellyfin API, so each user
-only ever sees their own history.
+## Requirements
+
+- Jellyfin **12.x** (built and tested on 12.2, web client)
+- **File Transformation** plugin (required)
+- **Plugin Pages** plugin (recommended, adds the entry to the user menu)
+
+Both plugins are in the repository `https://www.iamparadox.dev/jellyfin/plugins/manifest.json`.
 
 ## Install
 
-1. Create a GitHub repo, push this folder, then tag a release: `git tag v1.0.0.0 && git push --tags`
-2. The workflow builds the plugin and publishes `manifest.json` with the release.
-3. In Jellyfin: Dashboard > Plugins > Repositories > add
-   `https://github.com/<you>/jellyfin-tbd-watch-history/releases/latest/download/manifest.json`
-4. Install **TBD Watch History** from the catalogue and restart Jellyfin.
-5. Hard-refresh the web client. A history icon appears in the header and "Watch History" in the sidebar.
+1. In Jellyfin open **Dashboard > Plugins > Repositories**, click **+** and add:
+
+   `https://github.com/pr1megitty/jellyfin-watch-history/releases/latest/download/manifest.json`
+
+2. Open the **Catalogue**, install **TBD Watch History**, then restart Jellyfin.
+3. Hard-refresh the web client (Ctrl+F5).
+4. Click your avatar and choose **Watch History**.
+
+Without Plugin Pages there is no menu entry, so a small round history button appears in the bottom-right
+corner of the web client instead.
 
 ## Where it works
 
-Anything that loads the Jellyfin web UI from the server: desktop and phone browsers, installed web
-apps, and TV apps that run the web client. Native apps (Android TV / Android, Swiftfin, Roku, etc.)
-ignore server-injected scripts, so no plugin can add a page there.
+Anything that loads the Jellyfin web UI from the server: desktop and phone browsers, the Jellyfin iOS app,
+and TV apps that run the web client. Native apps (Android TV / Android, Swiftfin, Roku, etc.) ignore
+server-injected scripts, so no plugin can add a page there.
+
+## Updating
+
+Update the plugin from **Dashboard > Plugins**, restart Jellyfin and press Ctrl+F5.
