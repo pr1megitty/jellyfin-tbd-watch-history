@@ -1,4 +1,4 @@
-# TBD Watch History
+# Watch History
 
 A Jellyfin plugin that gives every user a **Watch History** page: the movies and TV episodes they have
 watched or started, newest first, grouped by day, with All / Movies / TV Episodes filters. Each user only
