@@ -15,27 +15,31 @@ public static class Transformer
 
     private static readonly Lazy<string> Script = new(LoadScript);
 
-    /// <summary>Called by File Transformation for index.html.</summary>
+    /// <summary>
+    /// Called by File Transformation for files whose name matches "index.html".
+    /// The pattern is a regex, so it can also match other files (and virtual files made by other plugins,
+    /// such as Plugin Pages' own chunks). Anything that is not a real HTML page is returned exactly as received.
+    /// </summary>
     public static string Inject(PatchRequestPayload payload)
     {
-        string html = payload.Contents ?? string.Empty;
+        string? original = payload.Contents;
 
-        if (html.Contains(Marker, StringComparison.Ordinal))
+        if (string.IsNullOrEmpty(original)
+            || original.Contains(Marker, StringComparison.Ordinal))
         {
-            return html;
+            return original!; // untouched (may be null for virtual files)
+        }
+
+        int index = original.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return original;
         }
 
         string flag = "<script>window.__tbdwhPage=" + (Plugin.PageRegistered ? "true" : "false") + ";</script>";
         string block = flag + "<script " + Marker + ">" + Script.Value + "</script>";
-        int index = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
 
-        if (index < 0)
-        {
-            // Not the real index.html (File Transformation can match other files too). Leave it untouched.
-            return html;
-        }
-
-        return html.Insert(index, block);
+        return original.Insert(index, block);
     }
 
     private static string LoadScript()
