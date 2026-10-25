@@ -311,10 +311,20 @@
 
     var openedFromPage = false;
 
+    var suppressUntil = 0;
+
     function closeAndReturn() {
         var fromPage = openedFromPage;
+        suppressUntil = Date.now() + 2000;
         close();
         if (fromPage) { window.history.back(); }
+    }
+
+    // Plugin Pages sends the user to #/userpluginsettings?pageUrl=tbdwatchhistory.html.
+    // On some servers that route does not exist and Jellyfin shows "Page not found",
+    // so the overlay is opened straight from the address instead.
+    function onHistoryRoute() {
+        return window.location.hash.indexOf('tbdwatchhistory.html') !== -1;
     }
 
     function onVideoRoute() {
@@ -347,8 +357,10 @@
 
     function autoOpenFromPage() {
         var p = document.getElementById('tbdwh-plugin-page');
-        if (p && !p.getAttribute('data-opened') && !overlay && userId()) {
-            p.setAttribute('data-opened', '1');
+        var viaPage = !!p && !p.getAttribute('data-opened');
+        var viaRoute = onHistoryRoute() && Date.now() > suppressUntil;
+        if ((viaPage || viaRoute) && !overlay && userId()) {
+            if (p) { p.setAttribute('data-opened', '1'); }
             open();
             openedFromPage = true;
         }
